@@ -93,7 +93,7 @@ function arm(k,fn){if(S.arm===k){S.arm=null;fn()}else{S.arm=k;setTimeout(()=>{if
 /* Catalog */
 function vCat(){
   return `<h1>Catalog</h1><p class="mu">Choose weight, piece, packet or bottle for each product. Enter the retail price (what customers pay) and the wholesale price (your cost). For weight items, prices per KG are enough: 500, 250 and 100 GM are worked out automatically.</p>`+
-  S.products.map(p=>`<div class="card"><input class="big" placeholder="Product name" value="${esc(p.name)}" onchange="upd('${p.id}','name',this.value)">
+  S.products.map((p,i)=>`<div class="card"><div class="sub" style="margin:0 0 6px">Product ${i+1}</div><input class="big" placeholder="Product name" value="${esc(p.name)}" onchange="upd('${p.id}','name',this.value)">
   <div class="chips g">${[['kg','By weight'],['pc','Per piece'],['pk','Per packet'],['bt','Per bottle']].map(([u,t])=>`<button class="chip ${(p.unit||'kg')===u?'on':''}" onclick="unit('${p.id}','${u}')">${t}</button>`).join('')}</div>
   ${priceForm(p)}
   <button class="link dg" onclick="delP('${p.id}')">${S.arm===p.id?'Tap again to delete':'Delete product'}</button></div>`).join('')+
@@ -120,7 +120,7 @@ function vOrd(){
   if(!prod(S.pid)||!prod(S.pid).name)S.pid=named.length?named[0].id:'';
   return `<h1>Enter orders</h1><div class="card">
   <label>Flat number<input value="${esc(S.flat)}" oninput="S.flat=this.value" placeholder="e.g. A-101" autocapitalize="characters" autocomplete="off"></label>
-  <label>Product<select onchange="S.pid=this.value;render()">${named.map(p=>`<option value="${p.id}" ${p.id===S.pid?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>
+  <label>Product<select onchange="S.pid=this.value;render()">${named.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}" ${p.id===S.pid?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>
   ${chips()}
   <div class="qty"><button onclick="q(-1)" aria-label="Less">−</button><input type="number" inputmode="numeric" value="${S.qty}" oninput="S.qty=Math.max(1,parseInt(this.value)||1)"><button onclick="q(1)" aria-label="More">+</button></div>
   <button class="btn" onclick="addL()">Add to order</button><p class="mu" style="margin:10px 0 0">${esc(S.msg)}</p></div>`+vLines();
@@ -155,7 +155,7 @@ function vLines(){
 }
 
 /* Summary */
-const wp=(t,s)=>{const p=prod(t.id),w=p?wprice(p,s):0;return w>0?' (Price: '+fmt(w)+')':''};
+const wp=(t,s)=>{const p=prod(t.id);if(!p)return'';const rt=price(p,s),ws=wprice(p,s);const parts=[];if(rt>0)parts.push('Retail: '+fmt(rt));if(ws>0)parts.push('Wholesale: '+fmt(ws));return parts.length?' ('+parts.join(', ')+')':''};
 function totals(){
   const m={};
   S.lines.forEach(l=>{const p=prod(l.pid),t=m[l.pid]=m[l.pid]||{id:l.pid,name:p?p.name:'Removed item',by:{}};t.by[l.size]=(t.by[l.size]||0)+l.qty});
@@ -214,7 +214,10 @@ function orderPdf(){
     if(y+rows.length*6+18>282){d.addPage();y=20}
     d.setFont('helvetica','bold');d.setFontSize(13);d.text((i+1)+'. '+t.name,15,y);y+=7;
     d.setFont('helvetica','normal');d.setFontSize(12);
-    rows.forEach(s=>{d.text(lbl(s),22,y);d.text(String(t.by[s]),90,y,{align:'right'});const w=wp(t,s);if(w)d.text(w.trim(),96,y);y+=6});
+    rows.forEach(s=>{
+      const line=d.splitTextToSize(lbl(s)+wp(t,s),145);
+      d.text(line,22,y);d.text(String(t.by[s]),195,y,{align:'right'});y+=6*line.length;
+    });
     if(t.kg>0){d.setTextColor(100);d.text('Total weight: '+fmt(t.kg)+' KG',22,y);d.setTextColor(0);y+=6}
     y+=5;
   });
